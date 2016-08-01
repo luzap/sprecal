@@ -4,11 +4,24 @@ from datetime import timedelta
 import sys
 import random
 
-from PyQt5 import QtCore, QtWidgets, QtGui
-from PyQt5.QtWidgets import QApplication, QMainWindow
+from PyQt5 import QtCore, QtWidgets
+from PyQt5.QtGui import QPainter
+from PyQt5.QtWidgets import QApplication, QMainWindow, QCalendarWidget
+
 
 import settings
 from database import DbInterface
+
+
+class SpacedCal(QCalendarWidget):
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+        self.painter = QPainter()
+
+    def highlight_dates(self):
+        pass
 
 
 # TODO Write docstring
@@ -57,7 +70,7 @@ class MainWindow(QMainWindow):
         self.gridLayout.addWidget(self.delete_task, 0, 1, 1, 1)
         self.delete_task.clicked.connect(self.delete_selected_task)
 
-        self.calendar = QtWidgets.QCalendarWidget(self.centralwidget)
+        self.calendar = SpacedCal(self.centralwidget)
         self.calendar.setObjectName("calendar")
         self.calendar.clicked.connect(self.change_date)
         self.gridLayout.addWidget(self.calendar, 1, 0, 1, 2)
