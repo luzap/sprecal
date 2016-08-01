@@ -13,3 +13,6 @@ SpReCal (short for **Sp**aced **re**call **cal**endar) is a utility designed to 
 ## Cosmetic issues
 - [ ] Change usage of default window icon
 - [ ] Incorrect dialogue titles
+
+## Licensing
+Due to the usage of PyQt, Sprecal is licensed under the GNU GPL 3.0.
