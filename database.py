@@ -19,14 +19,12 @@ class DbInterface:
                            )''')
 
     def make_task(self, data):
-        print(data)
         self.cursor.execute("INSERT INTO tasks VALUES(?, ?, ?, ?, ?)", data)
         self.conn.commit()
 
     def delete_task(self, task_id):
         self.cursor.execute("DELETE FROM tasks WHERE id = ?", (int(task_id),))
         self.conn.commit()
-        print("Task {} deleted".format(task_id))
 
     def get_columns(self):
         self.cursor.execute("PRAGMA table_info(tasks)")
