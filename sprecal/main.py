@@ -27,7 +27,7 @@ class MainWindow(QMainWindow):
         # Research does not outline any optimal intervals, but these work as well as any
         self.delta_time = [timedelta(days=1), timedelta(days=2), timedelta(days=7), timedelta(days=30),
                            timedelta(days=90), timedelta(days=180), timedelta(days=380)]
-        self.icon = QIcon(os.path.join(os.path.curdir, "icon.png"))  # Icon can be custom. Persistent throughtout
+        self.icon = QIcon(os.path.join(os.path.curdir, "icon.png"))  # Icon can be custom. Persistent throughout
 
         # QTimer for reminders. Moved from function since it's unnecessary to call multiple times
         self.timer = QTimer(self)  # If QTimer called with parent=None, it quits after first interval
