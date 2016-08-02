@@ -11,8 +11,8 @@ from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import QTimer
 from PyQt5.QtWidgets import QApplication, QMainWindow, QCalendarWidget, QMenu, QSystemTrayIcon
 
-import sprecal.settings as settings
-from sprecal.database import DbInterface
+import settings
+from database import DbInterface
 
 
 # TODO Write docstring
@@ -123,6 +123,7 @@ class MainWindow(QMainWindow):
         """Handle the system tray icon and associated slots."""
         self.systray = QSystemTrayIcon(QIcon())
         self.systray.setIcon(self.icon)
+        self.systray.activated.connect(self.show_main)  # Clicking on the systray icon shows MainWindow
 
         # Menu and menu actions are not tied to class, since they only need to be referenced once
         menu = QMenu()
@@ -134,6 +135,8 @@ class MainWindow(QMainWindow):
         open_window.triggered.connect(self.show_main)
         exit_entry.triggered.connect(QApplication.quit)  # Only way to exit the application
         self.systray.show()
+
+
 
     @QtCore.pyqtSlot()
     def display_message(self):
@@ -206,36 +209,42 @@ class TaskDialog(QtWidgets.QDialog):
     def __init__(self, db, date_selected, parent=None):
         super(TaskDialog, self).__init__(parent)
 
-        self.date_selected = date_selected
-        self.db = db
+        self.date_selected = date_selected  # Date of the selected day for task creation
+        self.db = db  # Reference to the database interface
 
         self.setWindowTitle("Add task")
         self.setFixedSize(220, 100)
 
+        # Main widget is necessary for all windows?
         self.widget = QtWidgets.QWidget(self)
 
-        self.widget.setGeometry(QtCore.QRect(9, 11, 194, 77))
+        self.widget.setGeometry(QtCore.QRect(9, 11, 194, 77))  # ?
         self.grid_layout = QtWidgets.QGridLayout(self.widget)
-        self.grid_layout.setContentsMargins(0, 0, 0, 0)
+        self.grid_layout.setContentsMargins(0, 0, 0, 0)  # ?
 
-        self.titleLabel = QtWidgets.QLabel(self)
-        self.grid_layout.addWidget(self.titleLabel, 0, 0, 1, 1)
+        # Label that accompanies the QLineEdit
+        self.title_label = QtWidgets.QLabel(self)
+        self.title_label.setText("Task name")
+        self.grid_layout.addWidget(self.title_label, 0, 0, 1, 1)
 
-        self.titleLineEdit = QtWidgets.QLineEdit(self.widget)
-        self.grid_layout.addWidget(self.titleLineEdit, 0, 1, 1, 1)
+        # QLineEdit for the title of the task
+        self.title_line_edit = QtWidgets.QLineEdit(self.widget)
+        self.grid_layout.addWidget(self.title_line_edit, 0, 1, 1, 1)
 
-        self.descriptionLabel = QtWidgets.QLabel(self.widget)
-        self.grid_layout.addWidget(self.descriptionLabel, 1, 0, 1, 1)
+        # Label that accompanies the following QLineEdit (maybe switch to QTextEdit?)
+        self.description_label = QtWidgets.QLabel(self.widget)
+        self.description_label.setText("Description")
+        self.grid_layout.addWidget(self.description_label, 1, 0, 1, 1)
 
-        self.descriptionLineEdit = QtWidgets.QLineEdit(self.widget)
-        self.grid_layout.addWidget(self.descriptionLineEdit, 1, 1, 1, 1)
+        # Allows for the adding of a task description
+        self.description_line_edit = QtWidgets.QLineEdit(self.widget)
+        self.grid_layout.addWidget(self.description_line_edit, 1, 1, 1, 1)
 
-        self.pushButton = QtWidgets.QPushButton(self.widget)
-        self.grid_layout.addWidget(self.pushButton, 2, 0, 1, 2)
-        self.titleLabel.setText("Name")
-        self.descriptionLabel.setText("Description")
-        self.pushButton.setText("Save")
-        self.pushButton.clicked.connect(self.add_task)
+
+        self.push_button = QtWidgets.QPushButton(self.widget)
+        self.push_button.setText("Save")
+        self.push_button.clicked.connect(self.add_task)
+        self.grid_layout.addWidget(self.push_button, 2, 0, 1, 2)
 
         self.show()
 
@@ -243,15 +252,15 @@ class TaskDialog(QtWidgets.QDialog):
     def add_task(self):
         """Connect to database, add task row and quit dialog."""
         # Column values, in order, are: id (auto-increments so not needed), name, description, current date, counter
-        data = (None, self.titleLineEdit.text(), self.descriptionLineEdit.text(), self.date_selected, 0)
+        data = (None, self.title_line_edit.text(), self.description_line_edit.text(), self.date_selected, 0)
         self.db.make_task(data)
-        self.accept()
+        self.accept()  # Closes the window (hides the dialog)
 
 
 def main():
-    db = DbInterface(settings.load_setting("db options", "name") + ".db")
+    db = DbInterface(settings.load_setting("db options", "name") + ".db")  # Allows for custom database name in future
     app = QApplication(sys.argv)
-    app.setQuitOnLastWindowClosed(False)
+    app.setQuitOnLastWindowClosed(False)  # Allows for the hiding of the MainWindow (?) without closing the application
     ex = MainWindow(db)
     sys.exit(app.exec_())
 
