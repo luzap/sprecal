@@ -11,7 +11,6 @@ from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import QTimer
 from PyQt5.QtWidgets import QApplication, QMainWindow, QCalendarWidget, QMenu, QSystemTrayIcon
 
-
 import sprecal.settings as settings
 from sprecal.database import DbInterface
 
@@ -34,18 +33,8 @@ class MainWindow(QMainWindow):
         self.timer.timeout.connect(self.display_message)
         self.timer.start(60000 * int(settings.load_setting("time", "interval")))
 
-        # Setup of UI elements
-        self.setup_ui()
-        self.setup_table()
-        self.system_tray()
-        self.show()
-
-    # TODO Clean up auto-generated code
-    def setup_ui(self):
-        """Setup the main UI and connect all signals."""
-        # General window settings
-        self.setWindowTitle("Sprecal")
-        self.setFixedSize(320, 520)
+        self.setWindowTitle("Sprecal")  # Hard-coded program title
+        self.setFixedSize(320, 520)  # These dimensions currently suffice, but could be played around with
         self.setWindowIcon(self.icon)
         self.setFocusPolicy(QtCore.Qt.TabFocus)
 
@@ -98,6 +87,11 @@ class MainWindow(QMainWindow):
         # Displays success or error messages
         self.statusbar = QtWidgets.QStatusBar(self)
         self.setStatusBar(self.statusbar)
+
+        # Setup of UI elements
+        self.setup_table()
+        self.system_tray()
+        self.show()
 
     @QtCore.pyqtSlot()
     def setup_table(self, date=datetime.datetime.now().date()):
@@ -207,33 +201,37 @@ class MainWindow(QMainWindow):
 
 # TODO Add docstring
 # TODO Arrange auto-generated code nicely
+# TODO Add comments
 class TaskDialog(QtWidgets.QDialog):
     def __init__(self, db, date_selected, parent=None):
         super(TaskDialog, self).__init__(parent)
+
         self.date_selected = date_selected
         self.db = db
+
         self.setWindowTitle("Add task")
         self.setFixedSize(220, 100)
+
         self.widget = QtWidgets.QWidget(self)
+
         self.widget.setGeometry(QtCore.QRect(9, 11, 194, 77))
-        self.gridLayout = QtWidgets.QGridLayout(self.widget)
-        self.gridLayout.setContentsMargins(0, 0, 0, 0)
+        self.grid_layout = QtWidgets.QGridLayout(self.widget)
+        self.grid_layout.setContentsMargins(0, 0, 0, 0)
 
         self.titleLabel = QtWidgets.QLabel(self)
-        self.gridLayout.addWidget(self.titleLabel, 0, 0, 1, 1)
+        self.grid_layout.addWidget(self.titleLabel, 0, 0, 1, 1)
 
         self.titleLineEdit = QtWidgets.QLineEdit(self.widget)
-        self.gridLayout.addWidget(self.titleLineEdit, 0, 1, 1, 1)
-
+        self.grid_layout.addWidget(self.titleLineEdit, 0, 1, 1, 1)
 
         self.descriptionLabel = QtWidgets.QLabel(self.widget)
-        self.gridLayout.addWidget(self.descriptionLabel, 1, 0, 1, 1)
+        self.grid_layout.addWidget(self.descriptionLabel, 1, 0, 1, 1)
 
         self.descriptionLineEdit = QtWidgets.QLineEdit(self.widget)
-        self.gridLayout.addWidget(self.descriptionLineEdit, 1, 1, 1, 1)
+        self.grid_layout.addWidget(self.descriptionLineEdit, 1, 1, 1, 1)
 
         self.pushButton = QtWidgets.QPushButton(self.widget)
-        self.gridLayout.addWidget(self.pushButton, 2, 0, 1, 2)
+        self.grid_layout.addWidget(self.pushButton, 2, 0, 1, 2)
         self.titleLabel.setText("Name")
         self.descriptionLabel.setText("Description")
         self.pushButton.setText("Save")
@@ -243,6 +241,8 @@ class TaskDialog(QtWidgets.QDialog):
 
     @QtCore.pyqtSlot()
     def add_task(self):
+        """Connect to database, add task row and quit dialog."""
+        # Column values, in order, are: id (auto-increments so not needed), name, description, current date, counter
         data = (None, self.titleLineEdit.text(), self.descriptionLineEdit.text(), self.date_selected, 0)
         self.db.make_task(data)
         self.accept()
