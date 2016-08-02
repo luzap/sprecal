@@ -5,7 +5,7 @@ import random
 import sys
 from datetime import timedelta
 
-import settings
+import sprecal.settings as settings
 from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtCore import QTimer
 from PyQt5.QtGui import QPainter, QIcon
@@ -13,17 +13,6 @@ from PyQt5.QtWidgets import QApplication, QMainWindow, QCalendarWidget, QMenu
 from PyQt5.QtWidgets import QSystemTrayIcon
 
 from sprecal.database import DbInterface
-
-
-class SpacedCal(QCalendarWidget):
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-
-        self.painter = QPainter()
-
-    def highlight_dates(self):
-        pass
 
 
 # TODO Write docstring
@@ -40,7 +29,7 @@ class MainWindow(QMainWindow):
         self.icon = QIcon(os.path.join(os.path.curdir, "icon.png"))
 
         # QTimer for reminders
-        self.timer = QTimer()
+        self.timer = QTimer(self)
         self.timer.timeout.connect(self.display_message)
         self.start_timer()
 
@@ -52,7 +41,7 @@ class MainWindow(QMainWindow):
     def start_timer(self):
         if self.timer.isActive():
             self.timer.stop()
-        self.timer.start(60000 * 1)  # QTimer takes milliseconds by default
+        self.timer.start(60000 * 10)  # QTimer takes milliseconds by default
 
     # TODO Clean up auto-generated code
     def setup_ui(self):
@@ -79,7 +68,7 @@ class MainWindow(QMainWindow):
         self.gridLayout.addWidget(self.delete_task, 0, 1, 1, 1)
         self.delete_task.clicked.connect(self.delete_selected_task)
 
-        self.calendar = SpacedCal(self.centralwidget)
+        self.calendar = QCalendarWidget(self.centralwidget)
         self.calendar.setGridVisible(True)
         self.gridLayout.addWidget(self.calendar, 1, 0, 1, 2)
         self.calendar.clicked.connect(self.change_date)
@@ -142,8 +131,11 @@ class MainWindow(QMainWindow):
 
     @QtCore.pyqtSlot()
     def display_message(self):
-        number = 0
-        self.showMessage("Reminder", "{} task{}left to go!".format(number, ((number > 1) or (number == 0)))*"s" + " ")
+        number = len(self.db.get_data(datetime.datetime.now().date()))
+        if number > 0:
+            self.systray.showMessage("Reminder", "{} task{}left to go!".format(number, (number > 1) * "s" + " "))
+        else:
+            self.systray.showMessage("Congratulations", "You're done for the day!")
 
     @QtCore.pyqtSlot()
     def change_date(self):
@@ -181,8 +173,7 @@ class MainWindow(QMainWindow):
                 new_date = self.date_selected + self.delta_time[counter]
             else:
                 new_date = self.date_selected + datetime.timedelta(days=(round(random.random()) * 1000))
-            counter += 1
-            self.db.change_task(id, new_date, counter)
+            self.db.change_task(id, new_date, counter + 1)
             self.setup_table()
         except TypeError:
             self.label.setText("No Task selected! Please try again.")
@@ -204,7 +195,6 @@ class TaskDialog(QtWidgets.QDialog):
     def __init__(self, db, date_selected, parent=None):
         super(TaskDialog, self).__init__(parent)
         self.date_selected = date_selected
-
         self.db = db
         self.setWindowTitle("Add task")
         self.setFixedSize(220, 100)
@@ -243,7 +233,7 @@ class TaskDialog(QtWidgets.QDialog):
 
 
 def main():
-    db = DbInterface(settings.load_setting("db options", "name") + '.db')
+    db = DbInterface(settings.load_setting("db options", "name") + ".db")
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
     ex = MainWindow(db)

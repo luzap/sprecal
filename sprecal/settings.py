@@ -5,6 +5,7 @@ from configparser import ConfigParser, ExtendedInterpolation
 
 STARTUP_DIR = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Run"
 
+
 def get_key_params(filename):
     return (filename.split("\\")[-1].split(".")[0].title(),
             os.path.join(os.path.abspath(os.path.curdir), filename))
