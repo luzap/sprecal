@@ -1,18 +1,18 @@
 # TODO Add beginning docstring + Sphinx ready
 import datetime
 import os
-from datetime import timedelta
-import sys
 import random
+import sys
+from datetime import timedelta
 
+import settings
 from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtCore import QTimer
 from PyQt5.QtGui import QPainter, QIcon
 from PyQt5.QtWidgets import QApplication, QMainWindow, QCalendarWidget, QMenu
 from PyQt5.QtWidgets import QSystemTrayIcon
 
-import settings
-from database import DbInterface
+from sprecal.database import DbInterface
 
 
 class SpacedCal(QCalendarWidget):
