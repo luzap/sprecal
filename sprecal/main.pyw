@@ -23,6 +23,12 @@ class MainWindow(QMainWindow):
         self.date_selected = datetime.datetime.now().date()  # For internal settings
         self.db = db  # Each component that writes to the database has the same instance
 
+        # Checks for tasks from the previous day, and transfers them over
+        old_tasks = self.db.get_data(self.date_selected - timedelta(days=1))
+        if len(old_tasks) != 0:
+            for item in old_tasks:
+                self.db.change_task(item[0], self.date_selected, item[-1])
+
         # Research does not outline any optimal intervals, but these work as well as any
         self.delta_time = [timedelta(days=1), timedelta(days=2), timedelta(days=7), timedelta(days=30),
                            timedelta(days=90), timedelta(days=180), timedelta(days=380)]
@@ -121,21 +127,20 @@ class MainWindow(QMainWindow):
 
     def system_tray(self):
         """Handle the system tray icon and associated slots."""
-        self.systray = QSystemTrayIcon(QIcon())
-        self.systray.setIcon(self.icon)
-        self.systray.activated.connect(self.show_main)  # Clicking on the systray icon shows MainWindow
+        self.tray_icon = QSystemTrayIcon(QIcon())
+        self.tray_icon.setIcon(self.icon)
 
         # Menu and menu actions are not tied to class, since they only need to be referenced once
         menu = QMenu()
         open_window = menu.addAction("Open window")
         exit_entry = menu.addAction("Exit")
-        self.systray.setContextMenu(menu)
-        self.systray.setToolTip("Sprecal")  # For easy system tray identification in case of custom icon
+        self.tray_icon.setContextMenu(menu)
+        self.tray_icon.setToolTip("Sprecal")  # For easy system tray identification in case of custom icon
 
         open_window.triggered.connect(self.show_main)
         exit_entry.triggered.connect(QApplication.quit)  # Only way to exit the application
-        self.systray.show()
-
+        self.tray_icon.activated.connect(self.show_main)  # Clicking on the systray icon shows MainWindow
+        self.tray_icon.show()
 
 
     @QtCore.pyqtSlot()
@@ -143,9 +148,9 @@ class MainWindow(QMainWindow):
         """Take amount of tasks for the day, displays system notification."""
         number = len(self.db.get_data(datetime.datetime.now().date()))
         if number > 0:
-            self.systray.showMessage("Reminder", "{} task{}left to go!".format(number, (number > 1) * "s" + " "))
+            self.tray_icon.showMessage("Reminder", "{} task{}left to go!".format(number, (number > 1) * "s" + " "))
         else:
-            self.systray.showMessage("Congratulations", "You're done for the day!")
+            self.tray_icon.showMessage("Congratulations", "You're done for the day!")
 
     @QtCore.pyqtSlot()
     def change_date(self):
@@ -188,7 +193,7 @@ class MainWindow(QMainWindow):
                 new_date = self.date_selected + datetime.timedelta(days=(round(random.random()) * 1000))
             self.db.change_task(task_id, new_date, counter + 1)
             self.setup_table()
-        except TypeError:
+        except (TypeError, AttributeError):
             self.label.setText("No Task selected! Please try again.")
 
     @QtCore.pyqtSlot()
