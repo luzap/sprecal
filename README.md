@@ -6,7 +6,7 @@ Sprecal (short for **sp**aced **re**call **cal**endar) is a utility designed to 
 - [ ] Add shortcuts for quick editing
 - [ ] Run on startup (Windows, Linux, Mac OS X)
 - [x] System tray integration
-- [ ] Transfer of incomplete tasks
+- [x] Transfer of incomplete tasks
 - [ ] License window
 - [ ] Settings
 - [ ] Code cleanup
