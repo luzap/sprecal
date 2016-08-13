@@ -7,7 +7,7 @@ import datetime
 from datetime import timedelta
 
 from PyQt5 import QtCore, QtWidgets
-from PyQt5.QtGui import QIcon
+from PyQt5.QtGui import QIcon, QKeySequence
 from PyQt5.QtCore import QTimer
 from PyQt5.QtWidgets import QApplication, QMainWindow, QCalendarWidget, QMenu, QSystemTrayIcon
 
@@ -57,6 +57,7 @@ class MainWindow(QMainWindow):
         self.add_task = QtWidgets.QPushButton(self.central_widget)
         self.add_task.setText("Add task")
         self.add_task.clicked.connect(self.make_task_dialog)
+        self.add_task.setShortcut(QKeySequence.New)
         self.add_task.setToolTip("Add a new task")
         self.grid_layout.addWidget(self.add_task, 0, 0, 1, 1)
 
@@ -65,6 +66,7 @@ class MainWindow(QMainWindow):
         self.delete_task.setText("Delete task")
         self.grid_layout.addWidget(self.delete_task, 0, 1, 1, 1)
         self.delete_task.clicked.connect(self.delete_selected_task)
+        self.delete_task.setShortcut(QKeySequence.Delete)
         self.delete_task.setToolTip("Delete selected task")
 
         # TODO Make custom calendar widget
@@ -87,6 +89,7 @@ class MainWindow(QMainWindow):
         # Mark complete button, bottom right
         self.mark_complete = QtWidgets.QPushButton(self.central_widget)
         self.mark_complete.setText("Mark complete")
+        self.mark_complete.setShortcut(QKeySequence("Ctrl+C"))
         self.grid_layout.addWidget(self.mark_complete, 4, 1, 1, 1)
         self.mark_complete.clicked.connect(self.mark_task_complete)
 
@@ -172,12 +175,13 @@ class MainWindow(QMainWindow):
     @QtCore.pyqtSlot()
     def delete_selected_task(self):
         """Remove selected task from database"""
-        row_num = self.table.currentItem().row()
-        if row_num is not None:  # If no task is selected in the QTableWidget, row_num is None
-            item = self.table.item(row_num, 0).text()
-            self.db.delete_task(item)
-            self.setup_table()
-        else:
+        try:
+            row_num = self.table.currentItem().row()
+            if row_num is not None:  # If no task is selected in the QTableWidget, row_num is None
+                item = self.table.item(row_num, 0).text()
+                self.db.delete_task(item)
+                self.setup_table()
+        except (AttributeError):
             self.label.setText("No Task selected! Please try again.")
 
     @QtCore.pyqtSlot()

@@ -3,10 +3,10 @@ Sprecal (short for **sp**aced **re**call **cal**endar) is a utility designed to 
 
 ## TODO
 - [ ] Date highlighting in the QCalendar widget 
-- [ ] Add shortcuts for quick editing
+- [x] Add shortcuts for quick editing
 - [ ] Run on startup (Windows, Linux, Mac OS X)
 - [x] System tray integration
-- [ ] Transfer of incomplete tasks
+- [x] Transfer of incomplete tasks (tasks will be moved over from the previous day on restart)
 - [ ] License window
 - [ ] Settings
 - [ ] Code cleanup
