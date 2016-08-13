@@ -82,6 +82,7 @@ class MainWindow(QMainWindow):
         self.grid_layout.addWidget(self.label, 2, 0, 1, 2)
 
         # Display of data
+        # Uses default AbstractItemView for data display (custom structure not needed)
         self.table = QtWidgets.QTableWidget(self.central_widget)
         self.table.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
         self.grid_layout.addWidget(self.table, 3, 0, 1, 2)
