@@ -20,14 +20,14 @@ class MainWindow(QMainWindow):
     def __init__(self, db):
         super(MainWindow, self).__init__()
 
-        self.date_selected = datetime.datetime.now().date()  # For internal settings
+        self.selected_date = datetime.datetime.now().date()  # For internal settings
         self.db = db  # Each component that writes to the database has the same instance
 
         # Checks for tasks from the previous day, and transfers them over
-        old_tasks = self.db.get_data(self.date_selected - timedelta(days=1))
+        old_tasks = self.db.get_data(self.selected_date - timedelta(days=1))
         if len(old_tasks) != 0:
             for item in old_tasks:
-                self.db.change_task(item[0], self.date_selected, item[-1])
+                self.db.change_task(item[0], self.selected_date, item[-1])
 
         # Research does not outline any optimal intervals, but these work as well as any
         self.delta_time = [timedelta(days=1), timedelta(days=2), timedelta(days=7), timedelta(days=30),
@@ -99,16 +99,17 @@ class MainWindow(QMainWindow):
         self.setStatusBar(self.statusbar)
 
         # Setup of UI elements
-        self.setup_table()
+        self.setup_table(self.selected_date)
         self.system_tray()
         self.show()
 
     @QtCore.pyqtSlot()
-    def setup_table(self, date=datetime.datetime.now().date()):
+    def setup_table(self, date):
         """Call to update data in QTableWidget."""
         self.table.clearContents()  # Removes content, leaving column headers
 
         self.table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)  # Visual selection of entire row
+        self.table.selectionModel().selectedRows()
         header = self.db.get_columns()  # Number of columns and headers are constant, so not crucial
         data = self.db.get_data(date)  # List of tuples representing all of the data for that day
 
@@ -159,14 +160,14 @@ class MainWindow(QMainWindow):
     @QtCore.pyqtSlot()
     def change_date(self):
         """Update UI upon date selection."""
-        self.date_selected = self.calendar.selectedDate().toPyDate()
+        self.selected_date = self.calendar.selectedDate().toPyDate()
         self.label.setText("The tasks for {}".format(self.calendar.selectedDate().toPyDate()))
-        self.setup_table(date=self.calendar.selectedDate().toPyDate())
+        self.setup_table(self.selected_date)
 
     @QtCore.pyqtSlot()
     def make_task_dialog(self):
         """Add new task to database"""
-        result = TaskDialog(self.db, self.date_selected).exec_()
+        result = TaskDialog(self.db, self.selected_date).exec_()
         if result == 0:
             self.statusbar.showMessage("No new task added!")
         else:
@@ -177,27 +178,29 @@ class MainWindow(QMainWindow):
     def delete_selected_task(self):
         """Remove selected task from database"""
         try:
-            row_num = self.table.currentItem().row()
-            if row_num is not None:  # If no task is selected in the QTableWidget, row_num is None
-                item = self.table.item(row_num, 0).text()
-                self.db.delete_task(item)
-                self.setup_table()
-        except (AttributeError):
+            selected_rows = self.table.selectionModel().selectedRows()
+            for item in selected_rows:
+                id = self.table.item(item.row(), 0).text()
+                self.db.delete_task(id)
+            self.setup_table(self.selected_date)
+        except Exception as e:
+            print(e)
             self.label.setText("No Task selected! Please try again.")
 
     @QtCore.pyqtSlot()
     def mark_task_complete(self):
         """Update counter and date of selected task."""
         try:  # Initially checked for None, but that was problematic
-            row_num = self.table.currentItem().row()
-            task_id = self.table.item(row_num, 0).text()
-            counter = int(self.table.item(row_num, 4).text())
-            if counter <= len(self.delta_time):
-                new_date = self.date_selected + self.delta_time[counter]
-            else:  #
-                new_date = self.date_selected + datetime.timedelta(days=(round(random.random()) * 1000))
-            self.db.change_task(task_id, new_date, counter + 1)
-            self.setup_table()
+            selected_rows = self.table.selectionModel().selectedRows()
+            for item in selected_rows:
+                task_id = self.table.item(item.row(), 0).text()
+                counter = int(self.table.item(item.row(), 4).text())
+                if counter <= len(self.delta_time):
+                    new_date = self.selected_date + self.delta_time[counter]
+                else:  #
+                    new_date = self.selected_date + datetime.timedelta(days=(round(random.random()) * 1000))
+                self.db.change_task(task_id, new_date, counter + 1)
+            self.setup_table(self.selected_date)
         except (TypeError, AttributeError):
             self.label.setText("No Task selected! Please try again.")
 
@@ -213,8 +216,6 @@ class MainWindow(QMainWindow):
 
 
 # TODO Add docstring
-# TODO Arrange auto-generated code nicely
-# TODO Add comments
 class TaskDialog(QtWidgets.QDialog):
     def __init__(self, db, date_selected, parent=None):
         super(TaskDialog, self).__init__(parent)
@@ -225,10 +226,11 @@ class TaskDialog(QtWidgets.QDialog):
         self.setWindowTitle("Add task")
         self.setFixedSize(220, 100)
 
-        # Main widget is necessary for all windows?
+        # Main widget is necessary for all windows, even if not used
         self.widget = QtWidgets.QWidget(self)
-
         self.widget.setGeometry(QtCore.QRect(9, 11, 194, 77))  # ?
+
+        # Standard grid layout, fit to window
         self.grid_layout = QtWidgets.QGridLayout(self.widget)
         self.grid_layout.setContentsMargins(0, 0, 0, 0)  # ?
 
@@ -250,7 +252,7 @@ class TaskDialog(QtWidgets.QDialog):
         self.description_line_edit = QtWidgets.QLineEdit(self.widget)
         self.grid_layout.addWidget(self.description_line_edit, 1, 1, 1, 1)
 
-
+        # Button that calls the save task function
         self.push_button = QtWidgets.QPushButton(self.widget)
         self.push_button.setText("Save")
         self.push_button.clicked.connect(self.add_task)
@@ -264,16 +266,15 @@ class TaskDialog(QtWidgets.QDialog):
         # Column values, in order, are: id (auto-increments so not needed), name, description, current date, counter
         data = (None, self.title_line_edit.text(), self.description_line_edit.text(), self.date_selected, 0)
         self.db.make_task(data)
-        self.accept()  # Closes the window (hides the dialog)
+        self.accept()  # Closes dialog
 
 
 def main():
     db = DbInterface(settings.load_setting("db options", "name") + ".db")  # Allows for custom database name in future
     app = QApplication(sys.argv)
-    app.setQuitOnLastWindowClosed(False)  # Allows for the hiding of the MainWindow (?) without closing the application
-    ex = MainWindow(db)
-    sys.exit(app.exec_())
-
+    app.setQuitOnLastWindowClosed(False)  # Allows for the hiding of the MainWindow without closing the application
+    ex = MainWindow(db)  # The same instance of the database object is passed to every object that uses it
+    sys.exit(app.exec_())  # ?
 
 if __name__ == '__main__':
     main()
