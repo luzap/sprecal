@@ -1,11 +1,6 @@
-# TODO Add beginning docstring + Sphinx ready
-# TODO Rename main class
-# TODO Clean up code
-# TODO Fix timer to not be annoying
-# TODO Find better way to manage database instance (try only reading it once)
-# TODO Start reducing specific exports when not necessary
-# TODO Move non-essential setup to external functions
-# TODO Start using private variables and methods (all of them should be, if I recall correctly)
+# TODO Change the dialog window so that it does not require the database to be passed
+# TODO Work on custom calendar widget that either highlights days
+# TODO Change the __populate_table method so that it does not require the date as a parameter
 
 import os
 import sys
@@ -13,197 +8,208 @@ import random
 import datetime
 from datetime import timedelta
 
-from PyQt5 import QtCore, QtWidgets
-from PyQt5.QtGui import QIcon
-from PyQt5.QtCore import QTimer
-from PyQt5.QtWidgets import QApplication, QMainWindow, QCalendarWidget, QMenu, QSystemTrayIcon
+import PyQt5
+from PyQt5 import QtCore, QtWidgets, QtGui
 
 import settings
 from database import DbInterface
 
 
-class MainWindow(QMainWindow):
-    """"""
+class TABLE:
+    """Basic enum that corresponds to the database columns."""
+    TASK_ID = 0
+    NAME = 1
+    DESC = 2
+    DATE = 3
+    COUNTER = 4
 
-    # My research does not outline optimal times for revision, but the general gist should be captured by these
-    # timings
+
+class SprecalWindow(QtWidgets.QMainWindow):
+    """Main application window. Handles user interaction with the calendar and delegates both the creation 
+    and manipulation of tasks to the database interface and dialog windows."""
+
+    # Research outlines only the general periods needed for the topic to sink in
     delta_time = [timedelta(days=day) for day in [1, 2, 7, 30, 90, 180, 380]]
 
-    def __init__(self, db):
-        super(MainWindow, self).__init__()
+    def __init__(self):
+        super(SprecalWindow, self).__init__()
 
         self.date_selected = datetime.datetime.now().date()  # For internal settings
-        self.db = db  # Each component that writes to the database has the same instance
+        self._db = DbInterface(settings.load_setting("db options", "name") + ".sqlite")
 
         # Checks for tasks from the previous day, and transfers them over
-        old_tasks = self.db.get_data(self.date_selected - timedelta(days=1))
+        old_tasks = self._db.get_data(self.date_selected - timedelta(days=1))
         if len(old_tasks):
             for item in old_tasks:
-                self.db.change_task(item[0], self.date_selected, item[-1])
+                self._db.change_task(item[0], self.date_selected, item[-1])
 
-        self.icon = QIcon(os.path.join(os.path.curdir, "icon.png"))  # Icon can be custom. Persistent throughout
+        # NB: If QTimer is instantiated with parent=None, it quits after first interval. Is this because there are
+        # no more references to it?
+        self._timer = QtCore.QTimer(self)
+        self._timer.timeout.connect(self.__display_message)
+        self._timer.start(60000 * int(settings.load_setting("time", "interval")))
 
-        # QTimer for reminders. Moved from function since it's unnecessary to call multiple times
-        self.timer = QTimer(self)  # If QTimer called with parent=None, it quits after first interval
-        self.timer.timeout.connect(self.display_message)
-        self.timer.start(60000 * int(settings.load_setting("time", "interval")))
+        self.setWindowTitle("Sprecal")
+        self.setFixedSize(340, 600)
 
-        self.setWindowTitle("Sprecal")  # Hard-coded program title
-        self.setFixedSize(320, 520)  # These dimensions currently suffice, but could be played around with
-        self.setWindowIcon(self.icon)
+        self._icon = QtGui.QIcon(os.path.join(os.path.curdir, "icon.png"))
+        self.setWindowIcon(self._icon)
+
+        # Determines how widgets accept keyboard focus. Read more here:
+        # https://doc.qt.io/qt-4.8/qwidget.html#focusPolicy-prop
         self.setFocusPolicy(QtCore.Qt.TabFocus)
 
         # Main widget required to create a QMainWindow object, even if widget is never referenced
-        self.central_widget = QtWidgets.QWidget(self)
-        self.setCentralWidget(self.central_widget)
+        self._central_widget = QtWidgets.QWidget(self)
+        self.setCentralWidget(self._central_widget)
 
-        # Layouts
-        self.horizontal_layout = QtWidgets.QHBoxLayout(self.central_widget)  # Fits grid layout to window
-        self.grid_layout = QtWidgets.QGridLayout()  # Handles layout of widgets
-        self.horizontal_layout.addLayout(self.grid_layout)
+        self._horizontal_layout = QtWidgets.QHBoxLayout(self._central_widget)  # Fits grid layout to window
+        self._grid_layout = QtWidgets.QGridLayout()  # Handles layout of widgets
+        self._horizontal_layout.addLayout(self._grid_layout)
 
-        # Add button, top left
-        self.add_task = QtWidgets.QPushButton(self.central_widget)
-        self.add_task.setText("Add task")
-        self.add_task.clicked.connect(self.make_task_dialog)
-        self.add_task.setToolTip("Add a new task")
-        self.grid_layout.addWidget(self.add_task, 0, 0, 1, 1)
+        self._add_task_button = QtWidgets.QPushButton(self._central_widget)
+        self._add_task_button.setText("Add task")
+        self._add_task_button.clicked.connect(self.make_task_dialog)
+        self._add_task_button.setToolTip("Add a new task")
+        self._grid_layout.addWidget(self._add_task_button, 0, 0, 1, 1)
 
-        # Delete button, top right
-        self.delete_task = QtWidgets.QPushButton(self.central_widget)
-        self.delete_task.setText("Delete task")
-        self.grid_layout.addWidget(self.delete_task, 0, 1, 1, 1)
-        self.delete_task.clicked.connect(self.delete_selected_task)
-        self.delete_task.setToolTip("Delete selected task")
+        self._delete_task_button = QtWidgets.QPushButton(self._central_widget)
+        self._delete_task_button.setText("Delete task")
+        self._grid_layout.addWidget(self._delete_task_button, 0, 1, 1, 1)
+        self._delete_task_button.clicked.connect(self.delete_selected_task)
+        self._delete_task_button.setToolTip("Delete selected task")
 
-        # TODO Make custom calendar widget
-        # TODO Write comment
-        self.calendar = QCalendarWidget(self.central_widget)
-        self.calendar.setGridVisible(True)
-        self.grid_layout.addWidget(self.calendar, 1, 0, 1, 2)
-        self.calendar.clicked.connect(self.change_date)
+        self._calendar = QtWidgets.QCalendarWidget(self._central_widget)
+        self._calendar.setGridVisible(True)
+        self._grid_layout.addWidget(self._calendar, 1, 0, 1, 2)
+        self._calendar.clicked.connect(self.change_date)
 
-        # Indicator of current day for QTableView
-        self.label = QtWidgets.QLabel(self.central_widget)
-        self.label.setText("The tasks for {}".format(self.calendar.selectedDate().toPyDate()))
-        self.grid_layout.addWidget(self.label, 2, 0, 1, 2)
+        self._table_label = QtWidgets.QLabel(self._central_widget)
+        self._table_label.setText("The tasks for {}".format(self._calendar.selectedDate().toPyDate()))
+        self._grid_layout.addWidget(self._table_label, 2, 0, 1, 2)
 
-        # Display of data
-        self.table = QtWidgets.QTableWidget(self.central_widget)
-        self.table.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
-        self.grid_layout.addWidget(self.table, 3, 0, 1, 2)
+        self._table = QtWidgets.QTableWidget(self._central_widget)
+        self._table.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+        self._grid_layout.addWidget(self._table, 3, 0, 1, 2)
 
-        # Mark complete button, bottom right
-        self.mark_complete = QtWidgets.QPushButton(self.central_widget)
+        self.mark_complete = QtWidgets.QPushButton(self._central_widget)
         self.mark_complete.setText("Mark complete")
-        self.grid_layout.addWidget(self.mark_complete, 4, 1, 1, 1)
+        self._grid_layout.addWidget(self.mark_complete, 4, 1, 1, 1)
         self.mark_complete.clicked.connect(self.mark_task_complete)
 
-        # Displays success or error messages
         self.statusbar = QtWidgets.QStatusBar(self)
         self.setStatusBar(self.statusbar)
 
-        # Setup of UI elements
-        self.setup_table()
-        self.system_tray()
+        # Setup of data in UI elements
+        self.__populate_table()
+        self.__sys_tray()
         self.show()
 
-    @QtCore.pyqtSlot()
-    def setup_table(self, date=datetime.datetime.now().date()):
+    def __populate_table(self, date=datetime.datetime.now().date()):
         """Call to update data in QTableWidget."""
-        self.table.clearContents()  # Removes content, leaving column headers
+        self._table.clearContents()  # Removes content, leaving column headers
 
-        self.table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)  # Visual selection of entire row
-        header = self.db.get_columns()  # Number of columns and headers are constant, so not crucial
-        data = self.db.get_data(date)  # List of tuples representing all of the data for that day
+        # Visually select the entire row
+        self._table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
+
+        header = self._db.get_columns()  # Number of columns and headers are constant, so not crucial
+        data = self._db.get_data(date)  # List of tuples representing all of the data for that day
 
         # Table setup
-        self.table.setColumnCount(len(header))
-        self.table.setRowCount(len(data))
-        self.table.setHorizontalHeaderLabels(header)
+        self._table.setColumnCount(len(header))
+        self._table.setRowCount(len(data))
+        self._table.setHorizontalHeaderLabels(header)
 
         # Hides columns for aesthetic purposes
-        self.table.setColumnHidden(header.index("id"), True)
-        self.table.setColumnHidden(header.index("date"), True)
+        self._table.setColumnHidden(header.index("id"), True)
+        self._table.setColumnHidden(header.index("date"), True)
 
-        # If there is data, traverses the data "matrix"
-        if len(data) > 0:
+        # If there is data, traverses the data "matrix". Might become bottleneck if there are enough entries, so be
+        # careful
+        if len(data):
             for row in range(len(data)):
                 for column in range(len(header)):
-                    self.table.setItem(row, column, QtWidgets.QTableWidgetItem(str(data[row][column])))
+                    self._table.setItem(row, column, QtWidgets.QTableWidgetItem(str(data[row][column])))
         else:
-            self.label.setText("This day has no tasks!")
+            self._table_label.setText("This day has no tasks!")
 
-    def system_tray(self):
+    def __sys_tray(self):
         """Handle the system tray icon and associated slots."""
-        self.tray_icon = QSystemTrayIcon(QIcon())
-        self.tray_icon.setIcon(self.icon)
+        self._tray_icon = QtWidgets.QSystemTrayIcon(QtGui.QIcon())
+        self._tray_icon.setIcon(self._icon)
 
         # Menu and menu actions are not tied to class, since they only need to be referenced once
-        menu = QMenu()
-        open_window = menu.addAction("Open window")
-        exit_entry = menu.addAction("Exit")
-        self.tray_icon.setContextMenu(menu)
-        self.tray_icon.setToolTip("Sprecal")  # For easy system tray identification in case of custom icon
+        _menu = QtWidgets.QMenu()
+        _open_window = _menu.addAction("Open window")
+        _exit_entry = _menu.addAction("Exit")
+        self._tray_icon.setContextMenu(_menu)
+        self._tray_icon.setToolTip("Sprecal")  # For easy system tray identification in case of custom icon
 
-        open_window.triggered.connect(self.show_main)
-        exit_entry.triggered.connect(QApplication.quit)  # Only way to exit the application
-        self.tray_icon.activated.connect(self.show_main)  # Clicking on the systray icon shows MainWindow
-        self.tray_icon.show()
-
+        _open_window.triggered.connect(self.show_main)
+        _exit_entry.triggered.connect(PyQt5.QtWidgets.QApplication.quit)  # Only way to exit the application
+        self._tray_icon.activated.connect(self.show_main)  # Clicking on the systray icon shows MainWindow
+        self._tray_icon.show()
 
     @QtCore.pyqtSlot()
-    def display_message(self):
+    def __display_message(self):
         """Take amount of tasks for the day, displays system notification."""
-        number = len(self.db.get_data(datetime.datetime.now().date()))
-        if number > 0:
-            self.tray_icon.showMessage("Reminder", "{} task{}left to go!".format(number, (number > 1) * "s" + " "))
+        number = len(self._db.get_data(datetime.datetime.now().date()))
+        if number:
+            self.startTimer()
+            self._tray_icon.showMessage("Reminder", "{} task{}left to go!".format(number, (number > 1) * "s" + " "))
         else:
-            self.tray_icon.showMessage("Congratulations", "You're done for the day!")
+            self._tray_icon.showMessage("Congratulations", "You're done for the day!")
+            self._timer.stop()
 
     @QtCore.pyqtSlot()
     def change_date(self):
         """Update UI upon date selection."""
-        self.date_selected = self.calendar.selectedDate().toPyDate()
-        self.label.setText("The tasks for {}".format(self.calendar.selectedDate().toPyDate()))
-        self.setup_table(date=self.calendar.selectedDate().toPyDate())
+        self.date_selected = self._calendar.selectedDate().toPyDate()
+        self._table_label.setText("The tasks for {}".format(self._calendar.selectedDate().toPyDate()))
+        self.__populate_table(date=self._calendar.selectedDate().toPyDate())
 
     @QtCore.pyqtSlot()
     def make_task_dialog(self):
         """Add new task to database"""
-        result = TaskDialog(self.db, self.date_selected).exec_()
+        result = TaskDialog(self._db, self.date_selected).exec_()
+        print(result)
         if result == 0:
             self.statusbar.showMessage("No new task added!")
         else:
-            self.statusbar.showMessage("Added task {}".format(self.db.get_last()))
+            self.statusbar.showMessage("Added task {}".format(self._db.get_last()))
             self.change_date()
 
     @QtCore.pyqtSlot()
     def delete_selected_task(self):
         """Remove selected task from database"""
-        row_num = self.table.currentItem().row()
-        if row_num is not None:  # If no task is selected in the QTableWidget, row_num is None
-            item = self.table.item(row_num, 0).text()
-            self.db.delete_task(item)
-            self.setup_table()
+        row_num = self._table.currentItem().row()
+
+        # If no task is selected in the QTableWidget, row_num is None
+        if row_num is not None:
+            self._db.delete_task(self._table.item(row_num, 0).text())
+            self.__populate_table(date=self.date_selected)
         else:
-            self.label.setText("No Task selected! Please try again.")
+            self._table_label.setText("No Task selected! Please try again.")
 
     @QtCore.pyqtSlot()
     def mark_task_complete(self):
         """Update counter and date of selected task."""
         try:  # Initially checked for None, but that was problematic
-            row_num = self.table.currentItem().row()
-            task_id = self.table.item(row_num, 0).text()
-            counter = int(self.table.item(row_num, 4).text())
+            row_num = self._table.currentItem().row()
+            task_id = self._table.item(row_num, TABLE.TASK_ID).text()
+            counter = int(self._table.item(row_num, TABLE.COUNTER).text())
             if counter <= len(self.delta_time):
                 new_date = self.date_selected + self.delta_time[counter]
-            else:  #
+            else:
+                # Even if first several reviews are done, that does not mean the individual can rest easy.
+                # The next review should occur sometime in the next three years, to make sure it sticks,
+                # thought it is mostly said that at the six month mark, things are pretty much embedded
+                # in memory
                 new_date = self.date_selected + datetime.timedelta(days=(round(random.random()) * 1000))
-            self.db.change_task(task_id, new_date, counter + 1)
-            self.setup_table()
+            self._db.change_task(task_id, new_date, counter + 1)
+            self.__populate_table()
         except (TypeError, AttributeError):
-            self.label.setText("No Task selected! Please try again.")
+            self._table_label.setText("No Task selected! Please try again.")
 
     @QtCore.pyqtSlot()
     def show_main(self):
@@ -211,6 +217,7 @@ class MainWindow(QMainWindow):
         self.show()
 
     # TODO Show info message that this only minimizes it to tray, and doesn't close
+    # TODO Allow this to be optional
     def closeEvent(self, event):
         """Hide main window. Overrides default closeEvent"""
         self.hide()
@@ -271,10 +278,9 @@ class TaskDialog(QtWidgets.QDialog):
 
 
 def main():
-    db = DbInterface(settings.load_setting("db options", "name") + ".sqlite")  # Allows for custom database name in future
-    app = QApplication(sys.argv)
+    app = QtWidgets.QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)  # Allows for the hiding of the MainWindow (?) without closing the application
-    ex = MainWindow(db)
+    ex = SprecalWindow()
     sys.exit(app.exec_())
 
 
