@@ -1,3 +1,4 @@
+# TODO Comment on what some of the functions do
 import sys
 import os
 import winreg

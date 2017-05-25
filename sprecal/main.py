@@ -1,4 +1,11 @@
 # TODO Add beginning docstring + Sphinx ready
+# TODO Rename main class
+# TODO Clean up code
+# TODO Fix timer to not be annoying
+# TODO Find better way to manage database instance (try only reading it once)
+# TODO Start reducing specific exports when not necessary
+# TODO Move non-essential setup to external functions
+# TODO Start using private variables and methods (all of them should be, if I recall correctly)
 
 import os
 import sys
@@ -15,8 +22,13 @@ import settings
 from database import DbInterface
 
 
-# TODO Write docstring
 class MainWindow(QMainWindow):
+    """"""
+
+    # My research does not outline optimal times for revision, but the general gist should be captured by these
+    # timings
+    delta_time = [timedelta(days=day) for day in [1, 2, 7, 30, 90, 180, 380]]
+
     def __init__(self, db):
         super(MainWindow, self).__init__()
 
@@ -25,13 +37,10 @@ class MainWindow(QMainWindow):
 
         # Checks for tasks from the previous day, and transfers them over
         old_tasks = self.db.get_data(self.date_selected - timedelta(days=1))
-        if len(old_tasks) != 0:
+        if len(old_tasks):
             for item in old_tasks:
                 self.db.change_task(item[0], self.date_selected, item[-1])
 
-        # Research does not outline any optimal intervals, but these work as well as any
-        self.delta_time = [timedelta(days=1), timedelta(days=2), timedelta(days=7), timedelta(days=30),
-                           timedelta(days=90), timedelta(days=180), timedelta(days=380)]
         self.icon = QIcon(os.path.join(os.path.curdir, "icon.png"))  # Icon can be custom. Persistent throughout
 
         # QTimer for reminders. Moved from function since it's unnecessary to call multiple times
@@ -245,7 +254,6 @@ class TaskDialog(QtWidgets.QDialog):
         self.description_line_edit = QtWidgets.QLineEdit(self.widget)
         self.grid_layout.addWidget(self.description_line_edit, 1, 1, 1, 1)
 
-
         self.push_button = QtWidgets.QPushButton(self.widget)
         self.push_button.setText("Save")
         self.push_button.clicked.connect(self.add_task)
@@ -263,7 +271,7 @@ class TaskDialog(QtWidgets.QDialog):
 
 
 def main():
-    db = DbInterface(settings.load_setting("db options", "name") + ".db")  # Allows for custom database name in future
+    db = DbInterface(settings.load_setting("db options", "name") + ".sqlite")  # Allows for custom database name in future
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)  # Allows for the hiding of the MainWindow (?) without closing the application
     ex = MainWindow(db)
